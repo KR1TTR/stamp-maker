@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stamp Maker</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<header>
+  <img src="icon.svg" alt="" width="34" height="34">
+  <div>
+    <h1>Stamp Maker</h1>
+    <p>A picture in, a 3D-printable leather stamp out. Your images never leave this computer.</p>
+  </div>
+</header>
+
+<main>
+  <aside class="controls">
+    <section>
+      <h2><span class="n">1</span> Your design</h2>
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/svg+xml,.svg">
+        <strong>Choose a picture</strong> or drop it here
+        <small>PNG, JPG or SVG. Dark lines on a light background work best.</small>
+      </label>
+      <div class="row between">
+        <span id="fileName" class="muted">No design loaded</span>
+        <button type="button" id="sample" class="link">Try a sample</button>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="n">2</span> Black and white</h2>
+      <label class="slider">Threshold <output id="thresholdOut"></output>
+        <input type="range" id="threshold" min="10" max="245" value="128">
+        <small>Move it until the flat view shows just your lines, no smudges.</small>
+      </label>
+      <label class="slider">Smooth the edges <output id="smoothOut"></output>
+        <input type="range" id="smooth" min="0" max="0.5" step="0.05" value="0.05">
+      </label>
+      <label class="check"><input type="checkbox" id="invert"> My design is light on a dark background</label>
+      <label class="check"><input type="checkbox" id="mirror" checked> Mirror it, so it reads right on the leather</label>
+    </section>
+
+    <section>
+      <h2><span class="n">3</span> Size</h2>
+      <div class="pair">
+        <label>Design width <span class="unit"><input type="number" id="width" min="5" max="300" step="0.5" value="40"> mm</span></label>
+        <label>Height <span class="unit"><input type="number" id="height" min="5" max="300" step="0.5" value="40"> mm</span></label>
+      </div>
+      <div class="pair">
+        <label>Relief depth <span class="unit"><input type="number" id="relief" min="0.5" max="10" step="0.1" value="3"> mm</span></label>
+        <label>Backing plate <span class="unit"><input type="number" id="backing" min="1" max="20" step="0.5" value="3"> mm</span></label>
+      </div>
+      <div class="pair">
+        <label>Border around it <span class="unit"><input type="number" id="margin" min="0" max="30" step="0.5" value="2"> mm</span></label>
+        <span></span>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="n">4</span> Taper</h2>
+      <p class="muted">Widens the lines toward the backing so thin lines and dots don't snap off. The face that touches the leather keeps your exact design.</p>
+      <label class="slider">Taper angle <output id="taperOut"></output>
+        <input type="range" id="taper" min="0" max="45" step="1" value="20">
+      </label>
+      <div class="pair">
+        <label>Straight tip <span class="unit"><input type="number" id="tip" min="0" max="5" step="0.1" value="0.5"> mm</span></label>
+        <label>Layer height <span class="unit"><input type="number" id="layer" min="0.04" max="0.4" step="0.02" value="0.2"> mm</span></label>
+      </div>
+      <label class="check"><input type="checkbox" id="capTaper" checked> Keep gaps between lines at least
+        <span class="unit"><input type="number" id="minGap" min="0.2" max="5" step="0.1" value="1"> mm</span> deep</label>
+      <div class="pair">
+        <label>Thinnest line you can print <span class="unit"><input type="number" id="minLine" min="0.1" max="2" step="0.05" value="0.4"> mm</span></label>
+        <span></span>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="n">5</span> Download</h2>
+      <button type="button" id="download" class="primary" disabled>Download STL</button>
+      <p id="stats" class="muted"></p>
+      <ul class="tips">
+        <li>Print it <strong>face up</strong>, with the backing plate on the bed.</li>
+        <li>A <strong>0.2 mm nozzle</strong> keeps fine lines crisp.</li>
+        <li>Set the slicer's layer height to the one above, so the taper steps line up.</li>
+        <li>Plastic stamps wear quickly: expect one to a few good impressions each.</li>
+      </ul>
+    </section>
+  </aside>
+
+  <section class="view">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tabFlat" class="on" aria-selected="true">Flat view</button>
+      <button type="button" role="tab" id="tab3d" aria-selected="false">3D view</button>
+      <span id="busy" hidden>Working…</span>
+    </div>
+    <div class="stage">
+      <div id="zoomBar" class="zoom-bar" hidden>
+        <button type="button" id="zoomOut" title="Zoom out" aria-label="Zoom out">−</button>
+        <button type="button" id="zoomFit" title="Fit the whole stamp in view">Fit</button>
+        <button type="button" id="zoomIn" title="Zoom in" aria-label="Zoom in">+</button>
+      </div>
+      <div id="flatWrap" class="pane">
+        <canvas id="flat"></canvas>
+        <div id="empty" class="empty">Choose a picture, or try the sample, to see your stamp here.</div>
+      </div>
+      <div id="threeWrap" class="pane" hidden></div>
+    </div>
+    <div class="legend" id="legend">
+      <span><i class="sw face"></i> Stamp face</span>
+      <span><i class="sw foot"></i> Taper, at its widest</span>
+      <span><i class="sw plate"></i> Backing plate</span>
+      <span><i class="sw thin"></i> Too thin to print</span>
+      <span><i class="sw gap"></i> Shallow gap</span>
+      <span><i class="sw kept"></i> Gap kept deep (less taper)</span>
+    </div>
+    <div id="warnings"></div>
+    <p class="muted note">The flat view shows the stamp's face as printed: mirrored, when mirroring is on.</p>
+  </section>
+</main>
+
+<footer>
+  Free software (GPLv3) · <a href="https://github.com/KR1TTR/stamp-maker">Source code on GitHub</a>
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
